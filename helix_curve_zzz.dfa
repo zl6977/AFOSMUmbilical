@@ -1,0 +1,102 @@
+﻿#! NX/KF 10.0
+DefClass: helix_curve_zzz (ug_base_part);
+
+(number parameter) radius_o: 3;
+#(number parameter) radius_hole: 0;
+(number parameter) pitch: 80;
+(point parameter) start_point: point(10,0,0);
+(number parameter) radius_pos: sqrt((start_point:-point(0,0,0)).(start_point:-point(0,0,0)));
+(integer parameter) num_point_in_pitch: 100;
+(number parameter) turn: 1.0;
+(number parameter) clockwise: 1;   # 1:clockwise; -1:anti-clockwise;
+
+(Child) ex_spline_cntl: {
+    Class,          ug_spline_cntl,
+    Points,         ex_points_zzz: 
+};
+
+(list) ex_points_zzz: loop
+{
+  for $n from 0 to num_point_in_pitch: -1;
+    for $delta_theta is (360*turn:) / (num_point_in_pitch: -1);
+    for $delta_z is (pitch:*turn:) / (num_point_in_pitch: -1);
+    for $p0_x is (start_point:-point(0,0,0)).vector(1,0,0);
+    for $p0_y is (start_point:-point(0,0,0)).vector(0,1,0);
+    for $p0_z is (start_point:-point(0,0,0)).vector(0,0,1);
+    for $theta0 is getTheta0:($p0_x, $p0_y);
+    for $pt is Point(radius_pos: *cos($theta0+clockwise:*$n*$delta_theta), radius_pos: *sin($theta0+clockwise:*$n*$delta_theta), $p0_z+$n*$delta_z);
+#    do printValue($pt);
+    collect {$pt};
+};
+
+# Methods of the class
+(Method Number) getTheta0:(Number $x0, Number $y0) 
+  @{  
+#    arctan has a numerical errors when theta is close to 90 or 270 degree
+#    if (($x0=0)&($y0>=0))  then 90
+#    else if (($x0=0)&($y0<0))  then 270
+#    else if (($x0>0) & ($y0>0)) then arctan($y0/$x0)
+#    else if (($x0<0) & ($y0>0)) then 180-arctan($y0/$x0)
+#    else if (($x0<0) & ($y0<0)) then 180+arctan($y0/$x0)
+#    else 360+arctan($y0/$x0);  
+    
+#    if (($x0>=0) & ($y0>=0)) then arccos($x0/sqrt($x0*$x0+$y0*$y0))
+#    else if (($x0<0) & ($y0>0)) then arccos($x0/sqrt($x0*$x0+$y0*$y0))
+#    else if (($x0<0) & ($y0<0)) then 360-arccos($x0/sqrt($x0*$x0+$y0*$y0))
+#    else 360-arccos($x0/sqrt($x0*$x0+$y0*$y0));
+
+    if ($y0>=0) then arccos($x0/sqrt($x0*$x0+$y0*$y0))
+    else 360-arccos($x0/sqrt($x0*$x0+$y0*$y0));
+  };
+
+(child) circle_sec_o: { 
+  class, ug_arc;
+  radius, radius_o:;
+#  start_angle, 0;
+#  end_angle, 360;
+  center, start_point:;
+};
+
+#(child) circle_sec_i: { 
+#  class, ug_arc;
+#  radius, radius_hole:;
+#  start_angle, 0;
+#  end_angle, 360;
+#  center, start_point:;
+#  X_Axis, Vector(pitch:,0,2*3.14*radius:);
+#  Y_Axis, Vector(0,radius:,0);
+#};
+
+#(child) sec_profile: {
+#  Class, ug_curve_join;
+#  profile, {circle_sec:};
+#};
+#(child) helix_path: {
+#  Class, ug_curve_join;
+#  profile, {ex_spline_cntl:};
+#};
+
+(child) rail_1: {
+  class, ug_swept;
+  guide, {{forward, ex_spline_cntl:}};
+  section, {{forward, circle_sec_o:}};  #a lot of arrow will be displayed depending on this. why? click "more""scence preference" cancle, arrows will disappear.
+  scaling, {scale_constant, 1};
+  alignment_init, parameter;
+#  orientation, {Orientation_Vector , Vector(0,0,1)};
+#  orientation, {Orientation_Curve, {forward, ex_spline_cntl:}};
+  orientation, {Orientation_Fixed};
+  tolerances, {0, 0, 0};
+  Body_Type,     Solid;
+};
+
+#(child) rail_hole: {
+#  class, ug_swept;
+#  guide, {{forward, ex_spline_cntl:}};
+#  section, {{forward, circle_sec_i:}};
+#  scaling, {scale_constant, 1};
+#  alignment_init, parameter;
+#  orientation, {Orientation_Vector , Vector(0,1,0)};
+#  tolerances, {0, 0, 0};
+#  Operation, Subtract;
+#  target, {rail_1:};
+#};
